@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Virtual Mouse | Hand Gesture Control System</title>
+  <meta name="description" content="AI-Based Virtual Mouse Using Hand Gestures powered by OpenCV, MediaPipe, and PyAutoGUI. Control your computer mouse hands-free with computer vision.">
+  
+  <!-- Modern Typography (Inter & Outfit) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons for aesthetics -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <!-- Ambient background glow elements -->
+  <div class="glow-orb orb-1"></div>
+  <div class="glow-orb orb-2"></div>
+
+  <!-- Header Navigation -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-icon">
+          <i class="fa-solid fa-hand-pointer"></i>
+        </div>
+        <div class="brand-text">
+          <h1>AI VIRTUAL MOUSE</h1>
+          <span class="subtitle">Computer Vision Hand Gesture System</span>
+        </div>
+      </div>
+      
+      <div class="header-status">
+        <div id="system-pill" class="status-pill offline">
+          <span class="pulse-dot"></span>
+          <span id="system-status-text">SYSTEM OFFLINE</span>
+        </div>
+        <div id="mouse-pill" class="status-pill mouse-active">
+          <i class="fa-solid fa-computer-mouse"></i>
+          <span id="mouse-status-text">Cursor Automation Active</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Application Container -->
+  <main class="dashboard-main">
+    <div class="dashboard-grid">
+
+      <!-- LEFT COLUMN: Live Camera Feed & Quick Actions -->
+      <section class="feed-section">
+        <div class="card video-card">
+          <div class="card-header">
+            <div class="header-title">
+              <i class="fa-solid fa-video"></i>
+              <h2>Live Camera Feed</h2>
+            </div>
+            <div class="header-actions">
+              <span class="feed-tag">640 &times; 480 &bull; MediaPipe Hands</span>
+            </div>
+          </div>
+          
+          <div class="video-container">
+            <img id="video-stream" src="{{ url_for('video_feed') }}" alt="Live Webcam Hand Tracking Feed">
+            
+            <!-- Video Overlay Badges -->
+            <div class="video-overlay-top">
+              <div class="hud-chip" id="hud-fps-chip">
+                <i class="fa-solid fa-gauge-high"></i>
+                <span id="hud-fps">0.0 FPS</span>
+              </div>
+              <div class="hud-chip" id="hud-hand-chip">
+                <i class="fa-solid fa-hand"></i>
+                <span id="hud-hand">No Hand</span>
+              </div>
+            </div>
+
+            <div class="video-overlay-bottom">
+              <div class="hud-badge-gesture" id="hud-gesture-badge">
+                <span class="badge-label">ACTIVE GESTURE</span>
+                <span class="badge-value" id="hud-gesture">IDLE</span>
+              </div>
+              <div class="hud-chip" id="hud-coords-chip">
+                <i class="fa-solid fa-crosshairs"></i>
+                <span id="hud-coords">X: 0 | Y: 0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Video Control Bar -->
+          <div class="video-controls">
+            <button id="btn-start" class="btn btn-primary" onclick="startCamera()">
+              <i class="fa-solid fa-play"></i> Start Virtual Mouse
+            </button>
+            <button id="btn-stop" class="btn btn-danger" onclick="stopCamera()">
+              <i class="fa-solid fa-stop"></i> Stop Mouse
+            </button>
+            <button id="btn-toggle-mouse" class="btn btn-secondary" onclick="toggleMouseCursor()">
+              <i class="fa-solid fa-arrow-pointer"></i> Toggle Cursor
+            </button>
+            
+            <div class="camera-select-wrap">
+              <label for="camera-select"><i class="fa-solid fa-camera"></i></label>
+              <select id="camera-select" onchange="switchCamera(this.value)">
+                <option value="0">Camera 0 (Default)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Telemetry Metrics Bar -->
+        <div class="telemetry-grid">
+          <div class="telemetry-card">
+            <div class="telemetry-icon fps-icon">
+              <i class="fa-solid fa-bolt"></i>
+            </div>
+            <div class="telemetry-data">
+              <span class="telemetry-label">Processing Rate</span>
+              <span class="telemetry-value" id="metric-fps">0.0 <small>FPS</small></span>
+            </div>
+          </div>
+
+          <div class="telemetry-card">
+            <div class="telemetry-icon gesture-icon">
+              <i class="fa-solid fa-wand-magic-sparkles"></i>
+            </div>
+            <div class="telemetry-data">
+              <span class="telemetry-label">Recognized Gesture</span>
+              <span class="telemetry-value highlight" id="metric-gesture">IDLE</span>
+            </div>
+          </div>
+
+          <div class="telemetry-card">
+            <div class="telemetry-icon tracking-icon">
+              <i class="fa-solid fa-fingerprint"></i>
+            </div>
+            <div class="telemetry-data">
+              <span class="telemetry-label">Hand State</span>
+              <span class="telemetry-value" id="metric-hand">Searching...</span>
+            </div>
+          </div>
+
+          <div class="telemetry-card">
+            <div class="telemetry-icon screen-icon">
+              <i class="fa-solid fa-display"></i>
+            </div>
+            <div class="telemetry-data">
+              <span class="telemetry-label">Screen Target</span>
+              <span class="telemetry-value" id="metric-coords">0, 0</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT COLUMN: Gesture Manual & Settings Panel -->
+      <section class="controls-section">
+        
+        <!-- Tabbed Navigation inside Right Column -->
+        <div class="tabs-bar">
+          <button class="tab-btn active" onclick="switchTab('gestures-tab')">
+            <i class="fa-solid fa-book-open"></i> Gesture Guide
+          </button>
+          <button class="tab-btn" onclick="switchTab('settings-tab')">
+            <i class="fa-solid fa-sliders"></i> System Settings
+          </button>
+          <button class="tab-btn" onclick="switchTab('project-tab')">
+            <i class="fa-solid fa-circle-info"></i> Architecture
+          </button>
+        </div>
+
+        <!-- TAB 1: GESTURE GUIDE -->
+        <div id="gestures-tab" class="tab-content active">
+          <div class="card">
+            <div class="card-header">
+              <div class="header-title">
+                <i class="fa-solid fa-hand"></i>
+                <h2>Supported Hand Gestures</h2>
+              </div>
+              <span class="info-tag">Real-Time Recognition</span>
+            </div>
+
+            <div class="gestures-list">
+              <div class="gesture-item">
+                <div class="gesture-visual move-gesture">
+                  <i class="fa-solid fa-arrow-pointer"></i>
+                </div>
+                <div class="gesture-info">
+                  <div class="gesture-name-row">
+                    <h3>Move Mouse</h3>
+                    <span class="tag-action">Cursor Control</span>
+                  </div>
+                  <p>Extend <strong>Index Finger</strong> only. Fold middle, ring, and pinky. Move finger to steer cursor.</p>
+                </div>
+              </div>
+
+              <div class="gesture-item">
+                <div class="gesture-visual left-click-gesture">
+                  <i class="fa-solid fa-arrow-down-left-and-up-right-to-center"></i>
+                </div>
+                <div class="gesture-info">
+                  <div class="gesture-name-row">
+                    <h3>Left Click</h3>
+                    <span class="tag-action action-click">Primary Select</span>
+                  </div>
+                  <p>Pinch <strong>Thumb Tip</strong> and <strong>Index Tip</strong> together while holding other fingers folded.</p>
+                </div>
+              </div>
+
+              <div class="gesture-item">
+                <div class="gesture-visual right-click-gesture">
+                  <i class="fa-solid fa-hand-scissors"></i>
+                </div>
+                <div class="gesture-info">
+                  <div class="gesture-name-row">
+                    <h3>Right Click</h3>
+                    <span class="tag-action action-right">Context Menu</span>
+                  </div>
+                  <p>Extend <strong>Index & Middle Fingers</strong> and pinch tips together (distance &lt; 38px).</p>
+                </div>
+              </div>
+
+              <div class="gesture-item">
+                <div class="gesture-visual double-click-gesture">
+                  <i class="fa-solid fa-computer-mouse"></i>
+                </div>
+                <div class="gesture-info">
+                  <div class="gesture-name-row">
+                    <h3>Double Click</h3>
+                    <span class="tag-action action-double">Open File</span>
+                  </div>
+                  <p>Perform two rapid Left Click taps <em>OR</em> touch <strong>Thumb Tip</strong> to <strong>Pinky Tip</strong>.</p>
+                </div>
+              </div>
+
+              <div class="gesture-item">
+                <div class="gesture-visual drag-gesture">
+                  <i class="fa-solid fa-hand-fist"></i>
+                </div>
+                <div class="gesture-info">
+                  <div class="gesture-name-row">
+                    <h3>Drag and Drop</h3>
+                    <span class="tag-action action-drag">Window Moving</span>
+                  </div>
+                  <p>Hold Thumb-Index pinch for &gt; 0.4s <em>OR</em> make a <strong>Closed Fist</strong>. Release to drop.</p>
+                </div>
+              </div>
+
+              <div class="gesture-item">
+                <div class="gesture-visual scroll-gesture">
+                  <i class="fa-solid fa-arrows-up-down"></i>
+                </div>
+                <div class="gesture-info">
+                  <div class="gesture-name-row">
+                    <h3>Scroll Up / Down</h3>
+                    <span class="tag-action action-scroll">Navigation</span>
+                  </div>
+                  <p>Raise <strong>Index & Middle</strong> separated (Peace sign). Move hand up to scroll up, down to scroll down.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: SYSTEM SETTINGS -->
+        <div id="settings-tab" class="tab-content">
+          <div class="card">
+            <div class="card-header">
+              <div class="header-title">
+                <i class="fa-solid fa-gear"></i>
+                <h2>Thresholds & Tuning</h2>
+              </div>
+              <button class="btn btn-outline" onclick="loadSettings()">
+                <i class="fa-solid fa-rotate"></i> Reset
+              </button>
+            </div>
+
+            <form id="settings-form" onsubmit="saveSettings(event)" class="settings-form">
+              <div class="form-group">
+                <div class="label-row">
+                  <label for="smoothing_factor">Motion Smoothing Factor</label>
+                  <span class="slider-val" id="val-smoothing">5.0</span>
+                </div>
+                <input type="range" id="smoothing_factor" name="SMOOTHING_FACTOR" min="1.0" max="15.0" step="0.5" value="5.0" oninput="updateSliderVal('smoothing', this.value)">
+                <small class="help-text">Higher values eliminate jitter/shake; lower values provide rapid twitch response.</small>
+              </div>
+
+              <div class="form-group">
+                <div class="label-row">
+                  <label for="click_distance">Left Click Pinch Distance (px)</label>
+                  <span class="slider-val" id="val-click-dist">38</span>
+                </div>
+                <input type="range" id="click_distance" name="LEFT_CLICK_DISTANCE" min="20" max="70" step="1" value="38" oninput="updateSliderVal('click-dist', this.value)">
+                <small class="help-text">Euclidean pixel distance between Thumb and Index tip to register a click.</small>
+              </div>
+
+              <div class="form-group">
+                <div class="label-row">
+                  <label for="right_click_distance">Right Click Distance (px)</label>
+                  <span class="slider-val" id="val-right-dist">38</span>
+                </div>
+                <input type="range" id="right_click_distance" name="RIGHT_CLICK_DISTANCE" min="20" max="70" step="1" value="38" oninput="updateSliderVal('right-dist', this.value)">
+                <small class="help-text">Distance between Index and Middle finger tips to trigger right click.</small>
+              </div>
+
+              <div class="form-group">
+                <div class="label-row">
+                  <label for="scroll_speed">Scroll Sensitivity / Speed</label>
+                  <span class="slider-val" id="val-scroll-speed">40</span>
+                </div>
+                <input type="range" id="scroll_speed" name="SCROLL_SPEED" min="10" max="100" step="5" value="40" oninput="updateSliderVal('scroll-speed', this.value)">
+                <small class="help-text">Wheel scroll ticks generated during scroll gestures.</small>
+              </div>
+
+              <div class="form-group checkbox-group">
+                <label class="switch-wrap">
+                  <input type="checkbox" id="invert_scroll" name="INVERT_SCROLL">
+                  <span class="switch-slider"></span>
+                </label>
+                <label for="invert_scroll" class="switch-label">Invert Vertical Scroll Direction</label>
+              </div>
+
+              <div class="form-group">
+                <button type="submit" class="btn btn-primary full-width">
+                  <i class="fa-solid fa-floppy-disk"></i> Apply Live Settings
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- TAB 3: ARCHITECTURE & PROJECT INFO -->
+        <div id="project-tab" class="tab-content">
+          <div class="card">
+            <div class="card-header">
+              <div class="header-title">
+                <i class="fa-solid fa-microchip"></i>
+                <h2>Project Architecture</h2>
+              </div>
+            </div>
+
+            <div class="architecture-content">
+              <h3>Computer Vision Pipeline</h3>
+              <div class="pipeline-steps">
+                <div class="step-card">
+                  <span class="step-num">01</span>
+                  <h4>Webcam Acquisition</h4>
+                  <p>OpenCV DirectShow frames read at 640&times;480 and mirrored horizontally.</p>
+                </div>
+                <div class="step-card">
+                  <span class="step-num">02</span>
+                  <h4>MediaPipe 21-Landmark Detection</h4>
+                  <p>ML pipeline extracts 3D coordinates for palm and all 5 fingertips.</p>
+                </div>
+                <div class="step-card">
+                  <span class="step-num">03</span>
+                  <h4>Geometric Classification</h4>
+                  <p>Euclidean distances, flexion angles, and state-machine debouncing.</p>
+                </div>
+                <div class="step-card">
+                  <span class="step-num">04</span>
+                  <h4>Adaptive Interpolation</h4>
+                  <p>Active boundary box coordinate mapping with exponential smoothing.</p>
+                </div>
+                <div class="step-card">
+                  <span class="step-num">05</span>
+                  <h4>OS Execution &amp; Telemetry</h4>
+                  <p>PyAutoGUI native events fired; live video streamed to Web UI via MJPEG.</p>
+                </div>
+              </div>
+
+              <div class="tech-stack-chips">
+                <span class="chip">Python 3.10</span>
+                <span class="chip">OpenCV 4.11</span>
+                <span class="chip">MediaPipe 0.10.14</span>
+                <span class="chip">PyAutoGUI</span>
+                <span class="chip">Flask Web Server</span>
+                <span class="chip">NumPy</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Client-side Logic -->
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
